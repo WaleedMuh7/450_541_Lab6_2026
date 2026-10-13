@@ -13,6 +13,7 @@ public class PlayerMovement : MonoBehaviour
     [Header("Ground Check Settings")]
     [SerializeField] private float groundDistance = 0.5f; // ray length
     [SerializeField] private LayerMask groundMask;        // ground layers
+    [SerializeField] private float doubleJumpForce = 4f;
 
     private Rigidbody rb;               // the physics body we move
     private Vector3 moveDirection;      // worked out from input in Update()
@@ -20,6 +21,8 @@ public class PlayerMovement : MonoBehaviour
     private bool isGrounded;            // true when standing on the ground
     private bool jumpRequested = false; // set in Update(), used later
 
+    private bool doubleJumpRequested = false;
+    private bool hasDoubleJumped = false;
     public bool IsGrounded => isGrounded;
 
     private void Start()
@@ -33,6 +36,10 @@ public class PlayerMovement : MonoBehaviour
         // 1. Ground Check
         isGrounded = Physics.Raycast(transform.position + transform.up*groundDistance/2, -transform.up, groundDistance, groundMask);
 
+        if (isGrounded) {
+            hasDoubleJumped = false;
+        }
+        
         // 2. Read Inputs
         turnInput = Input.GetAxisRaw("Horizontal"); // A/D or Left/Right turn input
         float moveZ = Input.GetAxisRaw("Vertical");  // W/S or Up/Down forward/backward
@@ -56,9 +63,23 @@ public class PlayerMovement : MonoBehaviour
 
         if (jumpRequested)
         {
-            Jump();
+            Jump(jumpForce);
             jumpRequested = false;
         }
+
+        // NEW: the second jump, in mid-air
+        if (doubleJumpRequested)
+        {
+            Jump(doubleJumpForce);
+            doubleJumpRequested = false;
+        }
+    }
+
+    private void Jump(float force)
+    {
+        rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f,
+                                        rb.linearVelocity.z);
+        rb.AddForce(Vector3.up * force, ForceMode.VelocityChange);
     }
 
     private void MovePlayer()
@@ -69,10 +90,16 @@ public class PlayerMovement : MonoBehaviour
         // Apply movement while preserving vertical velocity (gravity/jumping)
         rb.linearVelocity = new Vector3(targetVelocity.x, rb.linearVelocity.y, targetVelocity.z);
     }
-
-    private void Jump()
+    // Tries to jump a second time in mid-air.
+    // Returns true if the double jump really happened.
+    public bool TryDoubleJump()
     {
-        rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
-        rb.AddForce(Vector3.up * jumpForce, ForceMode.VelocityChange);
+        // Not allowed on the ground, or if it was already used
+        if (isGrounded || hasDoubleJumped) return false;
+
+        doubleJumpRequested = true;
+        hasDoubleJumped = true;
+        return true;
     }
+
 }
